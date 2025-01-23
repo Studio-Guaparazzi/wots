@@ -5,17 +5,30 @@ import { useEffect, useState } from 'react'
 
 export default function TestConnection() {
   const [status, setStatus] = useState<'loading' | 'connected' | 'error'>('loading')
+  const [message, setMessage] = useState<string>('')
   const supabase = createClient()
 
   useEffect(() => {
     async function checkConnection() {
       try {
-        const { data, error } = await supabase.from('dummy_query').select('*').limit(1)
-        if (error) throw error
+        // First check auth connection
+        const { data: { session }, error: authError } = await supabase.auth.getSession()
+        if (authError) throw authError
+
+        // Then check profiles table access
+        const { data, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .limit(1)
+        
+        if (profileError) throw profileError
+
         setStatus('connected')
+        setMessage(session ? 'Connected and authenticated!' : 'Connected but not authenticated')
       } catch (error) {
         console.error('Connection error:', error)
         setStatus('error')
+        setMessage(error instanceof Error ? error.message : 'Connection failed')
       }
     }
 
@@ -31,8 +44,8 @@ export default function TestConnection() {
         'text-yellow-500'
       }`}>
         {status === 'loading' ? 'Checking connection...' :
-         status === 'connected' ? 'Successfully connected to Supabase!' :
-         'Error connecting to Supabase'}
+         status === 'connected' ? message :
+         `Error: ${message}`}
       </p>
     </div>
   )
